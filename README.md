@@ -1,4 +1,8 @@
-# MockForge ⚡
+Maintained by [Ankara Yazılım](https://github.com/Ankara-Software) | [Project page](https://ankarayazilim.org/acik-kaynak/mockforge)
+
+**Status: stable.** It builds, the 2 unit tests pass and the flows in this README (tenant routing, stateful CRUD, rules, hot reload) were run against a local instance. Resource figures such as memory use and latency have not been measured.
+
+# MockForge
 
 <p align="center">
   <img src="assets/banner.png" alt="MockForge Banner" width="100%" />
@@ -8,55 +12,64 @@
   <img src="assets/logo.png" alt="MockForge Logo" width="150" />
 </p>
 
-<h3 align="center">The Ultimate Multi-Tenant Mock API Gateway</h3>
+<h3 align="center">A multi-tenant mock API gateway</h3>
 
 <p align="center">
-  <strong>High-performance, ultra-low memory, hot-reloading mock server that simulates entire SaaS backends and CRUD databases in RAM.</strong>
+  <strong>A mock server that simulates several backend services and simple CRUD data from one YAML file, with hot reloading and in-memory state.</strong>
 </p>
 
----
+## Türkçe
 
-## 🚀 The Pain Point
-
-Modern microservice or multi-tenant SaaS environments are painful to mock locally. Setting up 15-20 backend services for integration tests or frontend development is slow and hogs system resources. Postman's cloud mock servers are sluggish and require paid plans for high volume, while other mocking gateways consume hundreds of megabytes of RAM.
-
-**MockForge** solves this with a statically compiled Rust binary. It routes traffic for multiple tenants (services) using a single YAML configuration file, executes complex matching conditions, and manages in-memory CRUD state—all consuming less than **10 MB of RAM** with **sub-millisecond response times**.
+MockForge, tek bir YAML dosyasından birden fazla arka uç servisini ve basit CRUD verisini taklit eden bir mock API sunucusudur. İstekleri sunucu adına (`host`) ya da yol önekine (`prefix`) göre ilgili servise yönlendirir. `POST`, `PUT`, `PATCH` ve `DELETE` istekleri bellekteki veriyi günceller, sonraki `GET` istekleri güncel veriyi döndürür. Yanıtlar `params`, `query`, `headers` ve `body` üzerinde yazılan koşullara göre değişebilir. Yapılandırma dosyası değiştiğinde sunucu yeniden başlatılmadan güncellenir. Veri yalnızca bellekte tutulur, sunucu kapanınca kaybolur.
 
 ---
 
-## ✨ Features
+## The Pain Point
 
-- 🌐 **Multi-Tenancy**: Route mock API requests by **Hostname** (e.g. `payment.local`) or **Path Prefix** (e.g. `/auth`, `/payment`).
-- 💾 **In-Memory Stateful CRUD**: Bind mock endpoints to a dynamic state store. `POST`, `PUT`, `PATCH`, and `DELETE` requests directly update state in RAM, allowing subsequent `GET` requests to return the updated database state.
-- ⚙️ **Rules Engine**: Serve dynamic responses using simple conditional expressions (e.g. `params.id == '404'` or `headers.x-api-key != 'secret'`).
-- 🔄 **Hot Reloading**: Instantly watches your config file. Changing your mock configurations updates the server routes in real-time without restarts.
-- 🏎️ **Ultra Lightweight**: Zero-dependency binary compiled in Rust. No Node.js runtime, no Docker, no external database required.
+Setting up many backend services locally for integration tests or frontend development is slow and uses a lot of system resources. MockForge replaces them with a single compiled Rust binary. It routes traffic for multiple tenants (services) using one YAML configuration file, evaluates matching conditions, and keeps in-memory CRUD state. No Node.js runtime, Docker or external database is needed to run it.
 
 ---
 
-## 📦 Installation & Usage
+## Features
 
-### 1. Run Instantly (via npx)
-No setup required. The wrapper CLI will detect your OS and download the optimized binary automatically:
+- **Multi-Tenancy**: Route mock API requests by **Hostname** (e.g. `payment.local`) or **Path Prefix** (e.g. `/auth`, `/payment`).
+- **In-Memory Stateful CRUD**: Bind mock endpoints to a state store. `POST`, `PUT`, `PATCH`, and `DELETE` requests update the state in RAM, so later `GET` requests return the updated data. `PUT` replaces the whole object with the request body.
+- **Rules Engine**: Serve different responses with simple conditions on `params`, `query`, `headers` and `body`, using `==`, `!=`, `contains`, `exists` and `!exists` (e.g. `params.id == '404'` or `headers.x-api-key != 'secret'`).
+- **Hot Reloading**: Watches the config file. Changing it updates the routes without a restart.
+- **CORS**: Permissive CORS headers are enabled on every response.
+
+---
+
+## Installation & Usage
+
+### 1. Build From Source (Rust Cargo)
+```bash
+cargo install --git https://github.com/Ankara-Software/mockforge
+mockforge --config mockforge.yaml
+```
+
+### 2. Run via npx (Node.js required)
+The `mockforge-gateway` npm package is a small wrapper that downloads the release binary for your OS:
 ```bash
 npx mockforge-gateway --config mockforge.yaml --port 8080
 ```
 
-### 2. Global Install
+### 3. Global Install via npm
 ```bash
 npm install -g mockforge-gateway
 mockforge --config mockforge.yaml
 ```
 
-### 3. Build From Source (Rust Cargo)
-```bash
-cargo install --git https://github.com/anilcan-kara/mockforge
-mockforge --config mockforge.yaml
+### Options
+```
+-c, --config <FILE>   Config file [default: mockforge.yaml]
+-p, --port <PORT>     Port [default: 8080]
+-H, --host <HOST>     Address to bind [default: 127.0.0.1]
 ```
 
 ---
 
-## 🛠️ Configuration Guide (`mockforge.yaml`)
+## Configuration Guide (`mockforge.yaml`)
 
 Define all your mock microservices in a single, simple configuration file:
 
@@ -129,7 +142,7 @@ tenants:
 
 ---
 
-## 🛡️ Architecture & Request Life Cycle
+## Architecture & Request Life Cycle
 
 ```
                       [ Client Request ]
@@ -157,7 +170,7 @@ tenants:
 
 ---
 
-## 🤝 Verification & Manual Testing
+## Verification & Manual Testing
 
 1. **Start MockForge**:
    ```bash
@@ -182,6 +195,15 @@ tenants:
 
 ---
 
-## 📜 License
+## Development
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+```bash
+cargo build
+cargo test
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).

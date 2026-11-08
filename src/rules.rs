@@ -210,4 +210,22 @@ mod tests {
         assert_eq!(cond.op, RuleOp::Exists);
         assert_eq!(cond.value, None);
     }
+
+    #[test]
+    fn test_evaluate_header_and_body_conditions() {
+        let params = HashMap::new();
+        let query = HashMap::new();
+        let mut headers = HashMap::new();
+        headers.insert("x-api-key".to_string(), "secret".to_string());
+        let body: Value = serde_json::json!({ "user": { "role": "admin" } });
+
+        let not_equals = RuleCondition::parse("headers.x-api-key != 'secret'").unwrap();
+        assert!(!not_equals.evaluate(&params, &query, &headers, Some(&body)));
+
+        let missing_header = RuleCondition::parse("headers.x-token !exists").unwrap();
+        assert!(missing_header.evaluate(&params, &query, &headers, Some(&body)));
+
+        let body_equals = RuleCondition::parse("body.user.role == 'admin'").unwrap();
+        assert!(body_equals.evaluate(&params, &query, &headers, Some(&body)));
+    }
 }
