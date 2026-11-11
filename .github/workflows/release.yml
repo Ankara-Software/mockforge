@@ -9,29 +9,47 @@ permissions:
   contents: write
 
 jobs:
+  tickets:
+    name: Artifact tickets
+    runs-on: [self-hosted, s31]
+    outputs:
+      tickets: ${{ steps.t.outputs.tickets }}
+    steps:
+      - id: t
+        uses: Ankara-Software/ci-actions/artifact-ticket@v1
+        with:
+          names: mockforge-linux-x64 mockforge-linux-arm64 mockforge-darwin-x64 mockforge-darwin-arm64 mockforge-win32-x64.exe
+          hours: "6"
+
   build:
     name: Build - ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
+    needs: tickets
+    runs-on: ${{ fromJSON(matrix.runner) }}
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: linux
+            runner: '["self-hosted","s31"]'
             target: x86_64-unknown-linux-gnu
             asset_name: mockforge-linux-x64
             use_cross: false
-          - os: ubuntu-latest
+          - os: linux
+            runner: '["self-hosted","s31"]'
             target: aarch64-unknown-linux-gnu
             asset_name: mockforge-linux-arm64
             use_cross: true
-          - os: macos-latest
+          - os: macos
+            runner: '["self-hosted","macOS","s11"]'
             target: x86_64-apple-darwin
             asset_name: mockforge-darwin-x64
             use_cross: false
-          - os: macos-latest
+          - os: macos
+            runner: '["self-hosted","macOS","s11"]'
             target: aarch64-apple-darwin
             asset_name: mockforge-darwin-arm64
             use_cross: false
-          - os: windows-latest
+          - os: windows
+            runner: '["self-hosted","Windows","s18"]'
             target: x86_64-pc-windows-msvc
             asset_name: mockforge-win32-x64.exe
             use_cross: false
@@ -58,32 +76,58 @@ jobs:
         run: cross build --target ${{ matrix.target }} --release
 
       - name: Prepare asset (Windows)
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows'
         run: |
           mv target\${{ matrix.target }}\release\mockforge.exe ${{ matrix.asset_name }}
 
       - name: Prepare asset (Unix)
-        if: matrix.os != 'windows-latest'
+        if: matrix.os != 'windows'
         run: |
           mv target/${{ matrix.target }}/release/mockforge ${{ matrix.asset_name }}
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: Ankara-Software/ci-actions/artifact-upload@v1
         with:
           name: ${{ matrix.asset_name }}
           path: ${{ matrix.asset_name }}
+          ticket: ${{ toJSON(fromJSON(needs.tickets.outputs.tickets)[matrix.asset_name]) }}
 
   release:
     name: Create GitHub Release
-    needs: build
-    runs-on: ubuntu-latest
+    needs: [tickets, build]
+    runs-on: [self-hosted, s31]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+      - name: Download build artifacts
+        uses: Ankara-Software/ci-actions/artifact-download@v1
         with:
+          name: mockforge-linux-x64
+          path: ./artifacts
+
+      - name: Download build artifacts (linux arm64)
+        uses: Ankara-Software/ci-actions/artifact-download@v1
+        with:
+          name: mockforge-linux-arm64
+          path: ./artifacts
+
+      - name: Download build artifacts (darwin x64)
+        uses: Ankara-Software/ci-actions/artifact-download@v1
+        with:
+          name: mockforge-darwin-x64
+          path: ./artifacts
+
+      - name: Download build artifacts (darwin arm64)
+        uses: Ankara-Software/ci-actions/artifact-download@v1
+        with:
+          name: mockforge-darwin-arm64
+          path: ./artifacts
+
+      - name: Download build artifacts (windows x64)
+        uses: Ankara-Software/ci-actions/artifact-download@v1
+        with:
+          name: mockforge-win32-x64.exe
           path: ./artifacts
 
       - name: Flatten artifacts directory
