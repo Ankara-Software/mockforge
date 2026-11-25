@@ -57,9 +57,20 @@ async fn main() {
         }
     };
 
-    println!("{}", "==============================================".cyan());
-    println!("{}", "   MockForge - Dynamic Multi-Tenant Gateway   ".cyan().bold());
-    println!("{}", "==============================================".cyan());
+    println!(
+        "{}",
+        "==============================================".cyan()
+    );
+    println!(
+        "{}",
+        "   MockForge - Dynamic Multi-Tenant Gateway   "
+            .cyan()
+            .bold()
+    );
+    println!(
+        "{}",
+        "==============================================".cyan()
+    );
     println!("Loading configuration from: {}", args.config.yellow());
 
     let app_state = Arc::new(AppState {
@@ -85,7 +96,10 @@ async fn main() {
         }
     };
 
-    println!("Server listening on: {}", format!("http://{}", addr).green().bold());
+    println!(
+        "Server listening on: {}",
+        format!("http://{}", addr).green().bold()
+    );
     println!("{}", "Press Ctrl+C to stop.".dimmed());
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
@@ -208,7 +222,12 @@ async fn handle_request(
     if let Some(ref rules) = route.rules {
         for rule in rules {
             if let Some(cond) = RuleCondition::parse(&rule.r#if) {
-                if cond.evaluate(&path_params, &query_params, &req_headers, body_json.as_ref()) {
+                if cond.evaluate(
+                    &path_params,
+                    &query_params,
+                    &req_headers,
+                    body_json.as_ref(),
+                ) {
                     println!("  ↳ Rule matched: {}", rule.r#if.yellow());
                     return build_response(
                         rule.status.unwrap_or(200),
@@ -223,20 +242,30 @@ async fn handle_request(
     // 6. Stateful CRUD Store Logic
     if let Some(ref resource_name) = route.state {
         let default_body = route.default.as_ref().and_then(|d| d.body.clone());
-        app_state.state_store.ensure_resource(&tenant.name, resource_name, default_body);
+        app_state
+            .state_store
+            .ensure_resource(&tenant.name, resource_name, default_body);
 
         let method_str = method.as_str().to_uppercase();
         if method_str == "GET" {
             if !path_params.is_empty() {
                 // Get single item (find the first value in the extracted path parameters)
                 if let Some(id_val) = path_params.values().next() {
-                    if let Some(item) = app_state.state_store.get_by_id(&tenant.name, resource_name, id_val) {
+                    if let Some(item) =
+                        app_state
+                            .state_store
+                            .get_by_id(&tenant.name, resource_name, id_val)
+                    {
                         return build_response(200, Some(item), None);
                     }
                 }
                 // Fallback to route default or 404
                 if let Some(ref def) = route.default {
-                    return build_response(def.status.unwrap_or(404), def.body.clone(), def.headers.clone());
+                    return build_response(
+                        def.status.unwrap_or(404),
+                        def.body.clone(),
+                        def.headers.clone(),
+                    );
                 }
                 return build_response(
                     404,
@@ -250,7 +279,9 @@ async fn handle_request(
             }
         } else if method_str == "POST" {
             if let Some(val) = body_json {
-                let inserted = app_state.state_store.insert(&tenant.name, resource_name, val);
+                let inserted = app_state
+                    .state_store
+                    .insert(&tenant.name, resource_name, val);
                 return build_response(201, Some(inserted), None);
             } else {
                 return build_response(
@@ -262,7 +293,11 @@ async fn handle_request(
         } else if method_str == "PUT" || method_str == "PATCH" {
             if let Some(id_val) = path_params.values().next() {
                 if let Some(val) = body_json {
-                    if let Some(updated) = app_state.state_store.update(&tenant.name, resource_name, id_val, val) {
+                    if let Some(updated) =
+                        app_state
+                            .state_store
+                            .update(&tenant.name, resource_name, id_val, val)
+                    {
                         return build_response(200, Some(updated), None);
                     }
                     return build_response(
@@ -279,7 +314,10 @@ async fn handle_request(
             );
         } else if method_str == "DELETE" {
             if let Some(id_val) = path_params.values().next() {
-                if app_state.state_store.delete(&tenant.name, resource_name, id_val) {
+                if app_state
+                    .state_store
+                    .delete(&tenant.name, resource_name, id_val)
+                {
                     return build_response(204, None, None);
                 }
                 return build_response(
@@ -348,8 +386,7 @@ fn match_path_pattern(pattern: &str, path: &str) -> Option<HashMap<String, Strin
 
     let mut params = HashMap::new();
     for (pat_part, path_part) in pattern_parts.into_iter().zip(path_parts) {
-        if pat_part.starts_with(':') {
-            let param_name = &pat_part[1..];
+        if let Some(param_name) = pat_part.strip_prefix(':') {
             params.insert(param_name.to_string(), path_part.to_string());
         } else if pat_part != path_part {
             return None;
@@ -388,7 +425,9 @@ fn watch_config(path: PathBuf, app_state: Arc<AppState>) {
                             *config_guard = new_config;
                             println!(
                                 "{}",
-                                "[MockForge] Hot-reloaded configuration successfully!".green().bold()
+                                "[MockForge] Hot-reloaded configuration successfully!"
+                                    .green()
+                                    .bold()
                             );
                         }
                         Err(e) => {

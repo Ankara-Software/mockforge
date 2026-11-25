@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "master", "develop" ]
+  pull_request:
+    branches: [ "main", "master", "develop" ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test · ${{ matrix.os }}
+    runs-on: ${{ fromJSON(matrix.runner) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: '["self-hosted","s31"]'
+          - os: macos
+            runner: '["self-hosted","macOS","s11"]'
+          - os: windows
+            runner: '["self-hosted","Windows","s18"]'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure rustup in PATH (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          if [ ! -x "$HOME/.cargo/bin/rustup" ]; then
+            curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused --location --silent --show-error --fail https://sh.rustup.rs | sh -s -- --default-toolchain none -y --no-modify-path
+          fi
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Ensure rustup in PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          if [ -x "$USERPROFILE/.cargo/bin/rustup.exe" ]; then
+            echo "$USERPROFILE/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run tests
+        run: cargo test --verbose
+
+  clippy:
+    name: Clippy lint
+    runs-on: [self-hosted, s31]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure rustup in PATH (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          if [ ! -x "$HOME/.cargo/bin/rustup" ]; then
+            curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused --location --silent --show-error --fail https://sh.rustup.rs | sh -s -- --default-toolchain none -y --no-modify-path
+          fi
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Lint with Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+  fmt:
+    name: Rustfmt check
+    runs-on: [self-hosted, s31]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure rustup in PATH (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          if [ ! -x "$HOME/.cargo/bin/rustup" ]; then
+            curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused --location --silent --show-error --fail https://sh.rustup.rs | sh -s -- --default-toolchain none -y --no-modify-path
+          fi
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --check
