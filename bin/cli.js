@@ -6,7 +6,7 @@ const https = require('https');
 const { spawn } = require('child_process');
 
 const VERSION = '0.1.2';
-const REPO = 'anilcan-kara/mockforge';
+const REPO = 'Ankara-Software/mockforge';
 
 // Map Node platform/arch to release assets
 const platform = process.platform;

@@ -31,8 +31,8 @@ impl RuleCondition {
         let cond_str = cond_str.trim();
 
         // Check !exists / exists first
-        if cond_str.ends_with("!exists") {
-            let left = cond_str[..cond_str.len() - 7].trim();
+        if let Some(left) = cond_str.strip_suffix("!exists") {
+            let left = left.trim();
             let (source, key) = parse_left(left)?;
             return Some(RuleCondition {
                 source,
@@ -41,8 +41,8 @@ impl RuleCondition {
                 value: None,
             });
         }
-        if cond_str.ends_with("exists") {
-            let left = cond_str[..cond_str.len() - 6].trim();
+        if let Some(left) = cond_str.strip_suffix("exists") {
+            let left = left.trim();
             let (source, key) = parse_left(left)?;
             return Some(RuleCondition {
                 source,
@@ -162,11 +162,7 @@ fn get_json_value(val: &Value, key_path: &str) -> Option<String> {
     for part in key_path.split('.') {
         match current {
             Value::Object(map) => {
-                if let Some(next) = map.get(part) {
-                    current = next;
-                } else {
-                    return None;
-                }
+                current = map.get(part)?;
             }
             _ => return None,
         }

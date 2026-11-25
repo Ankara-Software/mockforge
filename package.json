@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/anilcan-kara/mockforge.git"
+    "url": "git+https://github.com/Ankara-Software/mockforge.git"
   },
   "keywords": [
     "mock",
@@ -26,9 +26,9 @@
   "author": "Anilcan Kara <anilcan.kara@outlook.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/anilcan-kara/mockforge/issues"
+    "url": "https://github.com/Ankara-Software/mockforge/issues"
   },
-  "homepage": "https://github.com/anilcan-kara/mockforge#readme",
+  "homepage": "https://github.com/Ankara-Software/mockforge#readme",
   "engines": {
     "node": ">=14.0.0"
   }

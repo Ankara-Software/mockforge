@@ -9,141 +9,114 @@ permissions:
   contents: write
 
 jobs:
-  tickets:
-    name: Artifact tickets
+  prepare:
+    name: Create draft release
     runs-on: [self-hosted, s31]
-    outputs:
-      tickets: ${{ steps.t.outputs.tickets }}
     steps:
-      - id: t
-        uses: Ankara-Software/ci-actions/artifact-ticket@v1
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
         with:
-          names: mockforge-linux-x64 mockforge-linux-arm64 mockforge-darwin-x64 mockforge-darwin-arm64 mockforge-win32-x64.exe
-          hours: "6"
+          draft: true
+          generate_release_notes: true
 
   build:
     name: Build - ${{ matrix.target }}
-    needs: tickets
+    needs: prepare
     runs-on: ${{ fromJSON(matrix.runner) }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: linux
             runner: '["self-hosted","s31"]'
             target: x86_64-unknown-linux-gnu
             asset_name: mockforge-linux-x64
-            use_cross: false
+            cross_arm64: false
           - os: linux
             runner: '["self-hosted","s31"]'
             target: aarch64-unknown-linux-gnu
             asset_name: mockforge-linux-arm64
-            use_cross: true
+            cross_arm64: true
           - os: macos
             runner: '["self-hosted","macOS","s11"]'
             target: x86_64-apple-darwin
             asset_name: mockforge-darwin-x64
-            use_cross: false
+            cross_arm64: false
           - os: macos
             runner: '["self-hosted","macOS","s11"]'
             target: aarch64-apple-darwin
             asset_name: mockforge-darwin-arm64
-            use_cross: false
+            cross_arm64: false
           - os: windows
             runner: '["self-hosted","Windows","s18"]'
             target: x86_64-pc-windows-msvc
             asset_name: mockforge-win32-x64.exe
-            use_cross: false
-
+            cross_arm64: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Ensure rustup in PATH (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          if [ ! -x "$HOME/.cargo/bin/rustup" ]; then
+            curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused --location --silent --show-error --fail https://sh.rustup.rs | sh -s -- --default-toolchain none -y --no-modify-path
+          fi
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Ensure rustup in PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          if [ -x "$USERPROFILE/.cargo/bin/rustup.exe" ]; then
+            echo "$USERPROFILE/.cargo/bin" >> "$GITHUB_PATH"
+          fi
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install Cross (if required)
-        if: matrix.use_cross
-        run: cargo install cross --git https://github.com/cross-rs/cross
+      - name: Install arm64 cross-linker (Linux)
+        if: matrix.cross_arm64
+        run: |
+          if ! command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+          fi
 
       - name: Build binary (Standard)
-        if: ${{ !matrix.use_cross }}
+        if: ${{ !matrix.cross_arm64 }}
         run: cargo build --target ${{ matrix.target }} --release
 
-      - name: Build binary (Cross)
-        if: matrix.use_cross
-        run: cross build --target ${{ matrix.target }} --release
+      - name: Build binary (Linux arm64)
+        if: matrix.cross_arm64
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+        run: cargo build --target ${{ matrix.target }} --release
 
       - name: Prepare asset (Windows)
         if: matrix.os == 'windows'
-        run: |
-          mv target\${{ matrix.target }}\release\mockforge.exe ${{ matrix.asset_name }}
+        run: Move-Item -Force "target\${{ matrix.target }}\release\mockforge.exe" "${{ matrix.asset_name }}"
 
       - name: Prepare asset (Unix)
         if: matrix.os != 'windows'
-        run: |
-          mv target/${{ matrix.target }}/release/mockforge ${{ matrix.asset_name }}
+        run: mv -f "target/${{ matrix.target }}/release/mockforge" "${{ matrix.asset_name }}"
 
-      - name: Upload Artifact
-        uses: Ankara-Software/ci-actions/artifact-upload@v1
+      - name: Upload asset to draft release
+        uses: softprops/action-gh-release@v2
         with:
-          name: ${{ matrix.asset_name }}
-          path: ${{ matrix.asset_name }}
-          ticket: ${{ toJSON(fromJSON(needs.tickets.outputs.tickets)[matrix.asset_name]) }}
+          draft: true
+          fail_on_unmatched_files: true
+          files: ${{ matrix.asset_name }}
 
-  release:
-    name: Create GitHub Release
-    needs: [tickets, build]
+  publish:
+    name: Publish release
+    needs: build
     runs-on: [self-hosted, s31]
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download build artifacts
-        uses: Ankara-Software/ci-actions/artifact-download@v1
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
         with:
-          name: mockforge-linux-x64
-          path: ./artifacts
-
-      - name: Download build artifacts (linux arm64)
-        uses: Ankara-Software/ci-actions/artifact-download@v1
-        with:
-          name: mockforge-linux-arm64
-          path: ./artifacts
-
-      - name: Download build artifacts (darwin x64)
-        uses: Ankara-Software/ci-actions/artifact-download@v1
-        with:
-          name: mockforge-darwin-x64
-          path: ./artifacts
-
-      - name: Download build artifacts (darwin arm64)
-        uses: Ankara-Software/ci-actions/artifact-download@v1
-        with:
-          name: mockforge-darwin-arm64
-          path: ./artifacts
-
-      - name: Download build artifacts (windows x64)
-        uses: Ankara-Software/ci-actions/artifact-download@v1
-        with:
-          name: mockforge-win32-x64.exe
-          path: ./artifacts
-
-      - name: Flatten artifacts directory
-        run: |
-          mkdir dist
-          find ./artifacts -type f -exec cp {} ./dist/ \;
-          ls -la ./dist/
-
-      - name: Create Release and Upload Assets
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            dist/mockforge-linux-x64
-            dist/mockforge-linux-arm64
-            dist/mockforge-darwin-x64
-            dist/mockforge-darwin-arm64
-            dist/mockforge-win32-x64.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          draft: false
+          make_latest: true

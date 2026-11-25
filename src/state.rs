@@ -2,10 +2,12 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
+type TenantData = HashMap<String, HashMap<String, Vec<Value>>>;
+
 #[derive(Clone, Default)]
 pub struct StateStore {
     // tenant -> resource_name -> list of values
-    pub data: Arc<RwLock<HashMap<String, HashMap<String, Vec<Value>>>>>,
+    pub data: Arc<RwLock<TenantData>>,
 }
 
 impl StateStore {
@@ -67,12 +69,21 @@ impl StateStore {
         item
     }
 
-    pub fn update(&self, tenant: &str, resource: &str, id: &str, mut new_item: Value) -> Option<Value> {
+    pub fn update(
+        &self,
+        tenant: &str,
+        resource: &str,
+        id: &str,
+        mut new_item: Value,
+    ) -> Option<Value> {
         let mut data = self.data.write().unwrap();
         let tenant_store = data.get_mut(tenant)?;
         let list = tenant_store.get_mut(resource)?;
 
-        if let Some(pos) = list.iter().position(|item| get_item_id(item).as_deref() == Some(id)) {
+        if let Some(pos) = list
+            .iter()
+            .position(|item| get_item_id(item).as_deref() == Some(id))
+        {
             // Retain original ID in the updated item
             if let Value::Object(ref mut map) = new_item {
                 if !map.contains_key("id") {
@@ -90,7 +101,10 @@ impl StateStore {
         let mut data = self.data.write().unwrap();
         if let Some(tenant_store) = data.get_mut(tenant) {
             if let Some(list) = tenant_store.get_mut(resource) {
-                if let Some(pos) = list.iter().position(|item| get_item_id(item).as_deref() == Some(id)) {
+                if let Some(pos) = list
+                    .iter()
+                    .position(|item| get_item_id(item).as_deref() == Some(id))
+                {
                     list.remove(pos);
                     return true;
                 }
@@ -103,7 +117,11 @@ impl StateStore {
 pub fn get_item_id(val: &Value) -> Option<String> {
     match val {
         Value::Object(map) => {
-            if let Some(id_val) = map.get("id").or_else(|| map.get("ID")).or_else(|| map.get("_id")) {
+            if let Some(id_val) = map
+                .get("id")
+                .or_else(|| map.get("ID"))
+                .or_else(|| map.get("_id"))
+            {
                 match id_val {
                     Value::String(s) => Some(s.clone()),
                     Value::Number(n) => Some(n.to_string()),
